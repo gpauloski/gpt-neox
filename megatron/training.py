@@ -28,6 +28,7 @@ import sys
 import torch
 import deepspeed
 import numpy as np
+import kfac
 
 from megatron.utils import (
     Timers,
@@ -55,6 +56,7 @@ from megatron.utils import (
     CharCounter,
 )
 from megatron.model.gpt2_model import cross_entropy
+from megatron.model.engine import initialize
 from eval_tasks import run_eval_harness
 
 
@@ -272,6 +274,43 @@ def get_model(neox_args, use_cache=False):
         raise ValueError("Must be using deepspeed to run neox")
 
 
+def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
+    if not neox_args.kfac_enabled:
+        return None
+
+    if neox_args.gradient_worker_fraction.lower() == "mem_opt":
+        strategy = kfac.DistributedStrategy.MEM_OPT
+    elif neox_args.gradient_worker_fraction.lower() == "comm_opt":
+        strategy = kfac.DistributedStrategy.COMM_OPT
+    else:
+        raise ValueError(f"Unknown KFAC strategy: {grad_worker_fraction=}")
+
+    preconditioner = kfac.KFAC(
+        model,
+        factor_update_steps=neox_args.factor_update_steps,
+        inv_update_steps=neox_args.inv_update_steps,
+        lr=lr_scheduler.get_lr,
+        damping=neox_args.kfac_damping,
+        factor_decay=neox_args.kfac_factor_decay,
+        kl_clip=neox_args.kfac_kl_clip,
+        accumulation_steps=neox_args.gradient_accumulation_steps,
+        allreduce_bucket_cap_mb=neox_args.kfac_allreduce_bucket_cap,
+        colocate_factors=True,
+        compute_eigenvalue_outer_product=neox_args.compute_eigenvalue_outer_product,
+        grad_worker_fraction=strategy,
+        # Note: we will monkeypatch in the correct grad_scaler after we
+        # initialize the optimizer with deepspeed
+        grad_scaler=None,
+        symmetry_aware=neox_args.symmetry_aware,
+        skip_layers=neox_args.skip_layers,
+        update_factors_in_hook=False,
+        verbose=True,
+    )
+    print_rank_0(preconditioner)
+
+    return preconditioner
+
+
 def get_optimizer(model, neox_args):
     """Set up the optimizer."""
     if neox_args.no_load_optim:
@@ -402,6 +441,12 @@ def setup_model_and_optimizer(neox_args, use_cache=False, iteration=None):
     model = get_model(neox_args=neox_args, use_cache=use_cache)
     optimizer, param_groups = get_optimizer(model=model, neox_args=neox_args)
     lr_scheduler = get_learning_rate_scheduler(optimizer=optimizer, neox_args=neox_args)
+    preconditioner = get_preconditioner(
+        model=model,
+        optimizer=optimizer,
+        lr_scheduler=lr_scheduler,
+        neox_args=neox_args,
+    )
 
     if neox_args.deepspeed:
         print_rank_0("DeepSpeed is enabled.")
@@ -413,9 +458,10 @@ def setup_model_and_optimizer(neox_args, use_cache=False, iteration=None):
             _model_params = param_groups if optimizer is None else None
             _lr_scheduler = lr_scheduler
 
-        model, optimizer, _, lr_scheduler = deepspeed.initialize(
+        model, optimizer, _, lr_scheduler = initialize(
             model=model,
             optimizer=optimizer,
+            preconditioner=preconditioner,
             args=neox_args,
             lr_scheduler=_lr_scheduler,
             dist_init_required=False,

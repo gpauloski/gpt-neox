@@ -30,6 +30,7 @@ from .neox_args import (
     NeoXArgsOther,
     NeoXArgsTextgen,
     NeoXArgsOptimizer,
+    NeoXArgsKFAC,
     NeoXArgsLRScheduler,
     ATTENTION_TYPE_CHOICES,
 )
@@ -66,6 +67,7 @@ BASE_CLASSES = [
     NeoXArgsModel,
     NeoXArgsLRScheduler,
     NeoXArgsOptimizer,
+    NeoXArgsKFAC,
     NeoXArgsTokenizer,
     NeoXArgsTraining,
     NeoXArgsParallelism,

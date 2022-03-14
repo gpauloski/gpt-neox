@@ -11,6 +11,8 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
+import kfac
+
 ATTENTION_TYPE_CHOICES = [
     "global",
     "local",
@@ -377,6 +379,68 @@ class NeoXArgsOptimizer(NeoXArgsTemplate):
     lr: float = None
     """
     Max Learning rate during training
+    """
+
+
+@dataclass
+class NeoXArgsKFAC(NeoXArgsTemplate):
+    """
+    KFAC Arguments
+    """
+    kfac_enabled: bool = False
+    """
+    Enable KFAC preconditioning.
+    """
+
+    factor_update_steps: int = 1
+    """
+    Steps between recomputing and allreducing KFAC factors.
+    """
+
+    inv_update_steps: int = 10
+    """
+    Steps between recomputing second-order information from factors.
+    """
+    
+    kfac_damping: float = 0.003
+    """
+    KFAC damping constant.
+    """
+
+    kfac_factor_decay: float = 0.95
+    """
+    KFAC running average of factors decay constant.
+    """
+
+    kfac_kl_clip: float = 0.001
+    """
+    KFAC KL clip constant used for scaling preconditioned gradients.
+    """
+    
+    kfac_allreduce_bucket_cap: float = 25.0
+    """
+    Allreduce bucket cap for KFAC factors.
+    """
+
+    compute_eigenvalue_outer_product: bool = True
+    """
+    Compute eigenvalue outer product on gradient worker. Reduces preconditioning
+    cost but uses more memory.
+    """
+
+    gradient_worker_fraction: Literal["comm_opt", "mem_opt"] = "mem_opt"
+    """
+    KFAC gradient worker fraction or DistributedStrategy.
+    """
+
+    symmetry_aware: bool = False
+    """
+    Use symmetry aware KFAC communication.
+    """
+
+    skip_layers: list = None
+    """
+    List of layers (strings) to ignore with KFAC.
     """
 
 
