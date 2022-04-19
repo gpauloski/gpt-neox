@@ -1,0 +1,24 @@
+{
+   "kfac_enabled": true,
+   "factor_update_steps": 5,
+   "inv_update_steps": 50,
+   "kfac_damping": 0.003,
+   "kfac_factor_decay": 0.95,
+   "kfac_kl_clip": 0.001,
+   "kfac_allreduce_bucket_cap": 25.0,
+   "compute_eigenvalue_outer_product": true,
+   "symmetry_aware": false,
+   "skip_layers": [
+      "EmbeddingPipe",
+      "ParallelLinearPipe",
+      "20.final_linear",
+      "21.final_linear",
+      "22.final_linear",
+      "23.final_linear",
+      "24.final_linear",
+      "25.final_linear",
+      "26.final_linear",
+      "27.final_linear",
+      "28.final_linear"
+   ],
+}

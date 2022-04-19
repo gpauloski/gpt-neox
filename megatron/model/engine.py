@@ -1,3 +1,4 @@
+import os
 import re
 import types
 from typing import Any
@@ -8,18 +9,21 @@ import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
-import deepspeed
 from deepspeed.runtime.engine import DeepSpeedEngine as _DeepSpeedEngine
 from deepspeed.runtime.pipe.engine import PipelineEngine as _PipelineEngine
 from deepspeed.runtime.pipe.module import PipelineModule
-from deepspeed.utils import log_dist
+from deepspeed.utils import logger, log_dist
 
 from deepspeed.git_version_info import version, git_hash, git_branch
 
+try:
+    from apex import amp
+except ImportError:
+    # Fail silently so we don't spam logs unnecessarily if user isn't using amp
+    pass
 
 def _parse_version(version_str):
     '''Parse a version string and extract the major, minor, and patch versions.'''
-    import re
     matched = re.search('^(\d+)\.(\d+)\.(\d+)', version_str)
     return int(matched.group(1)), int(matched.group(2)), int(matched.group(3))
 
@@ -243,7 +247,7 @@ class PipelineEngine(_PipelineEngine):
             grad_scaler = None
         if grad_scaler is not None and self.preconditioner is not None:
             self.preconditioner.grad_scaler = grad_scaler
-            for layer in self.preconditioner.layers.values():
+            for _, layer in self.preconditioner._layers.values():
                 layer.grad_scaler = grad_scaler
 
         self._load_checkpoint = types.MethodType(_load_checkpoint, self)

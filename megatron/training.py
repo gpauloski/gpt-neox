@@ -22,6 +22,7 @@
 from datetime import datetime
 from functools import partial
 
+import logging
 import math
 import sys
 
@@ -279,20 +280,20 @@ def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
         return None
 
     if neox_args.gradient_worker_fraction.lower() == "mem_opt":
-        strategy = kfac.DistributedStrategy.MEM_OPT
+        strategy = kfac.enums.DistributedStrategy.MEM_OPT
     elif neox_args.gradient_worker_fraction.lower() == "comm_opt":
-        strategy = kfac.DistributedStrategy.COMM_OPT
+        strategy = kfac.enums.DistributedStrategy.COMM_OPT
     else:
         raise ValueError(f"Unknown KFAC strategy: {grad_worker_fraction=}")
 
-    preconditioner = kfac.KFAC(
+    preconditioner = kfac.preconditioner.KFACPreconditioner(
         model,
         factor_update_steps=neox_args.factor_update_steps,
         inv_update_steps=neox_args.inv_update_steps,
-        lr=lr_scheduler.get_lr,
         damping=neox_args.kfac_damping,
         factor_decay=neox_args.kfac_factor_decay,
         kl_clip=neox_args.kfac_kl_clip,
+        lr=lambda step: lr_scheduler.get_lr(),
         accumulation_steps=neox_args.gradient_accumulation_steps,
         allreduce_bucket_cap_mb=neox_args.kfac_allreduce_bucket_cap,
         colocate_factors=True,
@@ -304,8 +305,9 @@ def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
         symmetry_aware=neox_args.symmetry_aware,
         skip_layers=neox_args.skip_layers,
         update_factors_in_hook=False,
-        verbose=True,
+        loglevel=logging.INFO,
     )
+    print_rank_0(preconditioner._assignment)
     print_rank_0(preconditioner)
 
     return preconditioner

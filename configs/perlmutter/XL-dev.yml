@@ -1,0 +1,111 @@
+# GPT-2 pretraining setup
+{
+   # data settings
+   "vocab-file": "/pscratch/sd/z/zhaozh/data/pile/gpt2-vocab.json",
+   "merge-file": "/pscratch/sd/z/zhaozh/data/pile/gpt2-merges.txt",
+   "save": "./runs/XL-dev/checkpoints",
+   "load": "./runs/XL-dev/checkpoints",
+   "tensorboard-dir": "./runs/XL-dev/tensorboard",
+   "log-dir": "./runs/XL-dev/logs",
+
+   # If finetuning, edit the following to the location of your finetuning dataset:
+   "data-path": "/pscratch/sd/j/jgpaul/datasets/pile/pile_text_document",
+
+   # parallelism settings ( you will want to change these based on your cluster setup, ideally scheduling pipeline stages
+   # across the node boundaries )
+   #"pipe-parallel-size": 1,
+   #"model-parallel-size": 1,
+
+   # KFAC works with (only true for 32 attention heads):
+   # 6.5 samples/sec: pipe-parallel=2, model-parallel=1, micro-batch-size=2
+   # 8.0 samples/sec: pipe-parallel=2, model-parallel=2, micro-batch-size=16
+   "pipe-parallel-size": 2,
+   "model-parallel-size": 1,
+
+   # model settings
+   "num-layers": 24,
+   "hidden-size": 2048,
+   "num-attention-heads": 32,
+   "seq-length": 2048,
+   "max-position-embeddings": 2048,
+   "norm": "layernorm",
+   "pos-emb": "rotary",
+   "no-weight-tying": true,
+
+   # these should provide some speedup but takes a while to build, set to true if desired
+   "scaled-upper-triang-masked-softmax-fusion": false,
+   "bias-gelu-fusion": false,
+
+   # optimizer settings
+   "optimizer": {
+     "type": "Adam",
+     "params": {
+       "lr": 0.0002,
+       "betas": [0.9, 0.999],
+       "eps":  1.0e-8,
+     }
+   },
+   "zero_optimization": {
+     # TODO(gpauloski): debug
+     "stage": 1,
+     #"stage": 0,
+     "allgather_partitions": True,
+     "allgather_bucket_size": 500000000,
+     "overlap_comm": True,
+     "reduce_scatter": True,
+     "reduce_bucket_size": 500000000,
+     "contiguous_gradients": True,
+     "cpu_offload": False
+   },
+
+   # batch / data settings
+   # TODO(gpauloski): reduced for KFAC
+   "train_micro_batch_size_per_gpu": 1,
+   # assuming 4 GPUs for 8192 batch size
+   #"gradient_accumulation_steps": 256,
+   "data-impl": "mmap",
+   "split": "949,50,1",
+
+   # activation checkpointing
+   "checkpoint-activations": true,
+   "checkpoint-num-layers": 1,
+   "partition-activations": true,
+   "synchronize-each-layer": true,
+
+   # regularization
+   "gradient_clipping": 1.0,
+   "weight-decay": 0,
+   "hidden-dropout": 0,
+   "attention-dropout": 0,
+
+   # precision settings
+   "fp16": {
+     "fp16": true,
+     # Reduce precision errors with KFAC in bfloat16
+     "type": "bfloat16",
+     "enabled": true,
+     "loss_scale": 0,
+     "loss_scale_window": 1000,
+     # Note(gpauloski): Set initial dynamic loss scale value to 2^15 to avoid
+     # some early overflows because the default is 2^32
+     "initial_scale_power": 15,
+     "hysteresis": 2,
+     "min_loss_scale": 1
+   },
+
+   # misc. training settings
+   "train-iters": 320000,
+   "lr-decay-iters": 320000,
+   "distributed-backend": "nccl",
+   "lr-decay-style": "cosine",
+   "warmup": 0.01,
+   "save-interval": 1000,
+   "eval-interval": 1000,
+   "eval-iters": 10,
+
+   # logging
+   "log-interval": 100,
+   "steps_per_print": 1,
+   "keep-last-n-checkpoints": 10000,
+   "wall_clock_breakdown": true,
+}
