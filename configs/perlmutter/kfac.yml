@@ -6,7 +6,7 @@
    "kfac_factor_decay": 0.95,
    "kfac_kl_clip": 0.001,
    "kfac_allreduce_bucket_cap": 25.0,
-   "compute_eigenvalue_outer_product": true,
+   "compute_eigenvalue_outer_product": false,
    "symmetry_aware": false,
    "skip_layers": [
       "EmbeddingPipe",

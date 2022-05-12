@@ -422,7 +422,7 @@ class NeoXArgsKFAC(NeoXArgsTemplate):
     Allreduce bucket cap for KFAC factors.
     """
 
-    compute_eigenvalue_outer_product: bool = True
+    compute_eigenvalue_outer_product: bool = False
     """
     Compute eigenvalue outer product on gradient worker. Reduces preconditioning
     cost but uses more memory.

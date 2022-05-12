@@ -279,14 +279,7 @@ def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
     if not neox_args.kfac_enabled:
         return None
 
-    if neox_args.gradient_worker_fraction.lower() == "mem_opt":
-        strategy = kfac.enums.DistributedStrategy.MEM_OPT
-    elif neox_args.gradient_worker_fraction.lower() == "comm_opt":
-        strategy = kfac.enums.DistributedStrategy.COMM_OPT
-    else:
-        raise ValueError(f"Unknown KFAC strategy: {grad_worker_fraction=}")
-
-    preconditioner = kfac.preconditioner.KFACPreconditioner(
+    preconditioner = kfac.gpt_neox.GPTNeoXKFACPreconditioner(
         model,
         factor_update_steps=neox_args.factor_update_steps,
         inv_update_steps=neox_args.inv_update_steps,
@@ -296,9 +289,8 @@ def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
         lr=lambda step: lr_scheduler.get_lr(),
         accumulation_steps=neox_args.gradient_accumulation_steps,
         allreduce_bucket_cap_mb=neox_args.kfac_allreduce_bucket_cap,
-        colocate_factors=True,
+        compute_method=kfac.enums.ComputeMethod.EIGEN,
         compute_eigenvalue_outer_product=neox_args.compute_eigenvalue_outer_product,
-        grad_worker_fraction=strategy,
         # Note: we will monkeypatch in the correct grad_scaler after we
         # initialize the optimizer with deepspeed
         grad_scaler=None,
@@ -307,8 +299,9 @@ def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
         update_factors_in_hook=False,
         loglevel=logging.INFO,
     )
-    print_rank_0(preconditioner._assignment)
+    
     print_rank_0(preconditioner)
+    print_rank_0(preconditioner._assignment)
 
     return preconditioner
 
