@@ -279,7 +279,8 @@ def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
     if not neox_args.kfac_enabled:
         return None
 
-    preconditioner = kfac.gpt_neox.GPTNeoXKFACPreconditioner(
+    import kfac.gpt_neox.preconditioner as kfac_gpt_neox
+    preconditioner = kfac_gpt_neox.GPTNeoXKFACPreconditioner(
         model,
         factor_update_steps=neox_args.factor_update_steps,
         inv_update_steps=neox_args.inv_update_steps,
@@ -288,18 +289,24 @@ def get_preconditioner(model, optimizer, lr_scheduler, neox_args):
         kl_clip=neox_args.kfac_kl_clip,
         lr=lambda step: lr_scheduler.get_lr(),
         accumulation_steps=neox_args.gradient_accumulation_steps,
+        # For 20B all the factors are huge so its recommended to set this
+        # to 0 in the config.
         allreduce_bucket_cap_mb=neox_args.kfac_allreduce_bucket_cap,
         compute_method=kfac.enums.ComputeMethod.EIGEN,
         compute_eigenvalue_outer_product=neox_args.compute_eigenvalue_outer_product,
         # Note: we will monkeypatch in the correct grad_scaler after we
         # initialize the optimizer with deepspeed
         grad_scaler=None,
+        data_parallel_group=mpu.get_data_parallel_group(),
+        model_parallel_group=mpu.get_model_parallel_group(),
+        pipeline_parallel_group=mpu.get_pipe_parallel_group(),
         symmetry_aware=neox_args.symmetry_aware,
+        factor_checkpoint_dir=neox_args.factor_checkpoint_dir,
         skip_layers=neox_args.skip_layers,
         update_factors_in_hook=False,
         loglevel=logging.INFO,
     )
-    
+
     print_rank_0(preconditioner)
     print_rank_0(preconditioner._assignment)
 

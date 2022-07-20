@@ -11,14 +11,6 @@
    "skip_layers": [
       "EmbeddingPipe",
       "ParallelLinearPipe",
-      "20.final_linear",
-      "21.final_linear",
-      "22.final_linear",
-      "23.final_linear",
-      "24.final_linear",
-      "25.final_linear",
-      "26.final_linear",
-      "27.final_linear",
-      "28.final_linear"
+      "\\d+\\.final_linear"
    ],
 }

@@ -1,0 +1,17 @@
+{
+   "kfac_enabled": true,
+   "factor_update_steps": 5,
+   "inv_update_steps": 50,
+   "kfac_damping": 0.003,
+   "kfac_factor_decay": 0.95,
+   "kfac_kl_clip": 0.001,
+   "kfac_allreduce_bucket_cap": 0.0,
+   "factor_checkpoint_dir": "./runs/gpt-20B-kfac/factor-checkpoints",
+   "compute_eigenvalue_outer_product": false,
+   "symmetry_aware": false,
+   "skip_layers": [
+      "EmbeddingPipe",
+      "ParallelLinearPipe",
+      "\\d+\\.final_linear"
+   ],
+}

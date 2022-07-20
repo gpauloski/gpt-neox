@@ -6,6 +6,7 @@ from typing import Optional
 from typing import Union
 
 import torch
+import torch.distributed as dist
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
 
@@ -15,6 +16,8 @@ from deepspeed.runtime.pipe.module import PipelineModule
 from deepspeed.utils import logger, log_dist
 
 from deepspeed.git_version_info import version, git_hash, git_branch
+
+from megatron.mpu.initialize import get_fp32_allreduce
 
 try:
     from apex import amp
@@ -97,8 +100,80 @@ def _load_checkpoint(self,
 
     return load_path, client_state
 
+def save_checkpoint(self, save_dir, tag=None, client_state={}, save_latest=True):
+    r"""Save training checkpoint
+
+    Note:
+        Overridding this because all ranks need to enter _save_checkpoint()
+
+    Arguments:
+        save_dir: Required. Directory for saving the checkpoint
+        tag: Optional. Checkpoint tag used as a unique identifier for the checkpoint, global step is
+            used if not provided. Tag name must be the same across all ranks.
+        client_state: Optional. State dictionary used for saving required training states in the client code.
+        save_latest: Optional. Save a file 'latest' pointing to the latest saved checkpoint.
+    
+    Important: all processes must call this method and not just the process with rank 0. It is
+    because each process needs to save its master weights and scheduler+optimizer states. This
+    method will hang waiting to synchronize with other processes if it's called just for the
+    process with rank 0.
+    """
+
+    if self.zero_optimization_partition_weights():
+        # Prepare for state_dict() by ensuring all parameters are partitioned
+        self.optimizer.save_checkpoint_prologue()
+
+    # This is to make sure the checkpoint names are created without collision
+    # There seems to be issue creating them in parallel
+
+    # Ensure save_dir directory exists
+    os.makedirs(save_dir, exist_ok=True)
+
+    if tag is None:
+        tag = f"global_step{self.global_steps}"
+
+    # Ensure tag is a string
+    tag = str(tag)
+
+    # Ensure checkpoint tag is consistent across ranks
+    self._checkpoint_tag_validation(tag)
+
+    if self.save_non_zero_checkpoint:
+        self._create_checkpoint_file(save_dir, tag, False)
+    # Note: the change in this function is moving the following method call
+    # outside of the above if statement so all ranks enter _save_checkpoint
+    self._save_checkpoint(save_dir, tag, client_state=client_state)
+
+    if self.save_zero_checkpoint:
+        self._create_zero_checkpoint_files(save_dir, tag)
+        self._save_zero_checkpoint(save_dir, tag)
+
+    # Save latest checkpoint tag
+    dist.barrier()
+    if save_latest:
+        with open(os.path.join(save_dir, 'latest'), 'w') as fd:
+            fd.write(tag)
+
+    if self.zero_optimization_partition_weights():
+        self.optimizer.save_checkpoint_epilogue()
+
+    # Prevent some ranks from exiting before all are done
+    torch.distributed.barrier()
+
+    return True
+
 
 def _save_checkpoint(self, save_dir, tag, client_state={}):
+
+    preconditioner = (
+        self.preconditioner.state_dict()
+        if self.preconditioner is not None
+        else None
+    )
+
+    if not self.save_non_zero_checkpoint:
+        # We only need ranks != 0 to call preconditioner state_dict
+        return
 
     save_path = self._get_ckpt_name(save_dir, tag)
     # A hack to save the checkpointing directory. Pipeline parallelism overrides
@@ -110,8 +185,7 @@ def _save_checkpoint(self, save_dir, tag, client_state={}):
         module=self.module_state_dict(),
         optimizer=self.optimizer.state_dict()
         if self.optimizer and not self.zero_optimization() else None,
-        preconditioner=self.preconditioner.state_dict()
-        if self.preconditioner is not None else None,
+        preconditioner=preconditioner,
         lr_scheduler=self.lr_scheduler.state_dict()
         if self.lr_scheduler is not None else None,
         csr_tensor_module_names=self.csr_tensor_module_names,
@@ -225,6 +299,7 @@ class DeepSpeedEngine(_DeepSpeedEngine):
             for layer in self.preconditioner.layers.values():
                 layer.grad_scaler = grad_scaler
 
+        self.save_checkpoint = types.MethodType(save_checkpoint, self)
         self._load_checkpoint = types.MethodType(_load_checkpoint, self)
         self._save_checkpoint = types.MethodType(_save_checkpoint, self)
         self._take_model_step = types.MethodType(_take_model_step, self)
@@ -250,6 +325,7 @@ class PipelineEngine(_PipelineEngine):
             for _, layer in self.preconditioner._layers.values():
                 layer.grad_scaler = grad_scaler
 
+        self.save_checkpoint = types.MethodType(save_checkpoint, self)
         self._load_checkpoint = types.MethodType(_load_checkpoint, self)
         self._save_checkpoint = types.MethodType(_save_checkpoint, self)
         self._take_model_step = types.MethodType(_take_model_step, self)

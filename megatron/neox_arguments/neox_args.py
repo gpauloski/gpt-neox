@@ -443,6 +443,11 @@ class NeoXArgsKFAC(NeoXArgsTemplate):
     List of layers (strings) to ignore with KFAC.
     """
 
+    factor_checkpoint_dir: str = None
+    """
+    Directory to save factor checkpoints to.
+    """
+
 
 @dataclass
 class NeoXArgsLRScheduler(NeoXArgsTemplate):
