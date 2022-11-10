@@ -141,6 +141,11 @@ class NeoXArgsModel(NeoXArgsTemplate):
     T5 relative positional encoding max distance, default 128.
     """
 
+    opt_pos_emb_offset: int = 0
+    """
+    Learned position embedding offset (only used by OPT, where it should be set to 2).
+    """
+
     no_weight_tying: bool = False
     """
     Disables weight tying between embedding weights and final Linear layer
@@ -398,7 +403,7 @@ class NeoXArgsLRScheduler(NeoXArgsTemplate):
 
     min_lr: float = 0.0
     """
-    Minumum value for learning rate. The scheduler clips values below this threshold.
+    Minimum value for learning rate. The scheduler clips values below this threshold.
     """
 
     warmup: float = 0.01
@@ -576,6 +581,11 @@ class NeoXArgsOther(NeoXArgsTemplate):
     Run via MPI, this will attempt to discover the necessary variables to initialize torch distributed from the MPI environment
     """
 
+    deepspeed_slurm: bool = False
+    """
+    Run via SLURM, this will attempt to discover the necessary variables to initialize torch distributed from the SLURM environment
+    """
+
     user_script: str = None
     """
     user script to be run
@@ -632,7 +642,7 @@ class NeoXArgsTokenizer(NeoXArgsTemplate):
 
     tokenizer = None
     """
-    tokenizer object loaded into memory and accesible by other functions
+    tokenizer object loaded into memory and accessible by other functions
     """
 
 
@@ -937,6 +947,11 @@ class NeoXArgsTextgen(NeoXArgsTemplate):
     top_k: int = 0
     """
     integer between 0 and the models vocab size. Filters out any logits with a probability less than that of the top_kth token.
+    """
+
+    return_logits: bool = False
+    """
+    Boolean for whether to return the logits for generated tokens
     """
 
     maximum_tokens: int = 64

@@ -27,7 +27,7 @@ LR Scheduler Arguments
 
     Default = 0.0
 
-    Minumum value for learning rate. The scheduler clips values below this threshold.
+    Minimum value for learning rate. The scheduler clips values below this threshold.
 
 
 
@@ -101,9 +101,17 @@ Logging Arguments
 
 
 
+- **wandb_init_all_ranks**: bool
+
+    Default = False
+
+    Initialize wandb on all ranks.
+
+
+
 - **git_hash**: str
 
-    Default = a593ce2
+    Default = 56b7427
 
     current git hash of repository
 
@@ -133,11 +141,19 @@ Logging Arguments
 
 
 
+- **log_grad_pct_zeros**: bool
+
+    Default = False
+
+    Log the percentage of zeros for the gradient of each parameter to wandb / tensorboard (useful for debugging). Needs wandb_init_all_ranks set to True if using pipeline parallelism to log all ranks.
+
+
+
 - **log_param_norm**: bool
 
     Default = False
 
-    Log the frob norm of the parameters to wandb / tensorboard (useful for debugging).
+    Log the frob norm of the parameters to wandb / tensorboard (useful for debugging). Needs wandb_init_all_ranks set to True if using pipeline parallelism to log all ranks.
 
 
 
@@ -290,6 +306,14 @@ Model Arguments
     Default = 128
 
     T5 relative positional encoding max distance, default 128.
+
+
+
+- **opt_pos_emb_offset**: int
+
+    Default = 0
+
+    Learned position embedding offset (only used by OPT, where it should be set to 2).
 
 
 
@@ -824,7 +848,7 @@ Text Generation arguments
 
 - **text_gen_type**: str
 
-    Default = unconditional
+    Default = None
 
     How to generate text/sample the model.
     Options: `unconditional`, `input-file`, `interactive`
@@ -852,6 +876,14 @@ Text Generation arguments
     Default = 0
 
     integer between 0 and the models vocab size. Filters out any logits with a probability less than that of the top_kth token.
+
+
+
+- **return_logits**: bool
+
+    Default = False
+
+    Boolean for whether to return the logits for generated tokens
 
 
 

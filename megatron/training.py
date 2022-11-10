@@ -61,7 +61,7 @@ from eval_tasks import run_eval_harness
 def pretrain(neox_args):
     """Main training program.
 
-    This function will run the followings in the order provided:
+    This function will run the following in the order provided:
         1) initialize Megatron.
         2) setup model, optimizer and lr schedule
         3) call train_val_test_data_provider to get train/val/test datasets.
@@ -77,7 +77,7 @@ def pretrain(neox_args):
         use_wandb=neox_args.use_wandb, tensorboard_writer=neox_args.tensorboard_writer
     )
 
-    # Initalize and get arguments, timers, and Tensorboard writer.
+    # Initialize and get arguments, timers, and Tensorboard writer.
     initialize_megatron(neox_args=neox_args)
 
     # Model, optimizer, and learning rate.
@@ -144,9 +144,10 @@ def pretrain(neox_args):
             forward_step_func=forward_step,
             data_iterator=test_data_iterator,
             model=model,
-            iteration=0,  # iteration 0 in order to always use full test data
+            iteration=iteration,
             verbose=True,
             timers=timers,
+            chart_name="test",
         )
 
 
@@ -706,7 +707,7 @@ def evaluate(
 
     if neox_args.char_level_ppl:
         # calculate character level perplexity, if specified
-        # if neox_args.char_level_perplexity:
+        # if neox_args.char_level_ppl:
         # unwrap the data_iterator
         tokens_per_char = data_iterator.tokens_per_char()
         print_rank_0(f"Counting chars took {data_iterator.total_time} seconds")
@@ -736,6 +737,7 @@ def evaluate_and_print_results(
     iteration,
     verbose=False,
     timers=None,
+    chart_name="validation",
 ):
     """Helper function to evaluate and dump results on screen."""
     total_loss_dict = evaluate(
@@ -746,14 +748,14 @@ def evaluate_and_print_results(
         verbose=verbose,
         timers=timers,
     )
-    string = f" validation results at {prefix} | "
+    string = f" {chart_name} results at {prefix} | "
     for k, v in total_loss_dict.items():
         if isinstance(v, dict):
             for k2, v2 in v.items():
                 k3 = "_".join([k, k2])
                 string += f"{k3} value: {v2:.6E} | "
                 tb_wandb_log(
-                    f"validation/{k3}",
+                    f"{chart_name}/{k3}",
                     v2,
                     iteration,
                     use_wandb=neox_args.use_wandb,
@@ -762,7 +764,7 @@ def evaluate_and_print_results(
         else:
             string += f"{k} value: {v:.6E} | "
             tb_wandb_log(
-                f"validation/{k}",
+                f"{chart_name}/{k}",
                 v,
                 iteration,
                 use_wandb=neox_args.use_wandb,
