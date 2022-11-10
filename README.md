@@ -28,45 +28,36 @@ For those looking for a TPU-centric codebase, we recommend [Mesh Transformer JAX
 - [Administrative Notes](#administrative-notes)
   * [Citing GPT-NeoX](#citing-gpt-neox)
   * [Licensing](#licensing)
+  * [Publications](#publications)
   * [Acknowledgements](#acknowledgements)
 
 # Pretrained Models
 
 ## GPT-NeoX-20B
 
-A 20 billion parameter autoregressive language model trained on the Pile. More technical details about GPT-NeoX-20B can be found in our [whitepaper](http://eaidata.bmk.sh/data/GPT_NeoX_20B.pdf).
-
-The configuration file for the model is available [here](./configs/20B.yml), and is also included in the download links below.
-
-To cite GPT-NeoX-20B, please cite the whitepaper as follows:
-
-```bibtex
-@article{gpt-neox-20b,
-  title={{GPT-NeoX-20B}: An Open-Source Autoregressive Language Model},
-  author={Black, Sid and Biderman, Stella and Hallahan, Eric and Anthony, Quentin and Gao, Leo and Golding, Laurence and He, Horace and Leahy, Connor and McDonell, Kyle and Phang, Jason and Pieler, Michael and Prashanth, USVSN Sai and Purohit, Shivanshu and Reynolds, Laria and Tow, Jonathan and Wang, Ben and Weinbach, Samuel},
-  year={2022}
-}
-```
+GPT-NeoX-20B is a 20 billion parameter autoregressive language model trained on [the Pile](https://arxiv.org/abs/2101.00027). Technical details about GPT-NeoX-20B can be found in [the associated paper](https://arxiv.org/abs/2204.06745). The configuration file for this model is both available at [`./configs/20B.yml`](./configs/20B.yml) and included in the download links below.
 
 ### Download Links
 
-[Slim weights](https://mystic.the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights/) - (No optimizer states, for inference or finetuning, 39GB)
+[Slim weights](https://the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights/) - (No optimizer states, for inference or finetuning, 39GB)
 
 To download from the command line to a folder named `20B_checkpoints`, use the following command:
 
 ```bash
-wget --cut-dirs=5 -nH -r --no-parent --reject "index.html*" https://mystic.the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights/ -P 20B_checkpoints
+wget --cut-dirs=5 -nH -r --no-parent --reject "index.html*" https://the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights/ -P 20B_checkpoints
 ```
 
-[Full weights](https://mystic.the-eye.eu/public/AI/models/GPT-NeoX-20B/full_weights/) - (Including optimizer states, 268GB)
+[Full weights](https://the-eye.eu/public/AI/models/GPT-NeoX-20B/full_weights/) - (Including optimizer states, 268GB)
 
 To download from the command line to a folder named `20B_checkpoints`, use the following command:
 
 ```bash
-wget --cut-dirs=5 -nH -r --no-parent --reject "index.html*" https://mystic.the-eye.eu/public/AI/models/GPT-NeoX-20B/full_weights/ -P 20B_checkpoints
+wget --cut-dirs=5 -nH -r --no-parent --reject "index.html*" https://the-eye.eu/public/AI/models/GPT-NeoX-20B/full_weights/ -P 20B_checkpoints
 ```
 
-Weights can be alternatively be downloaded using a BitTorrent client. Torrent files can be downloaded here: [slim weights](https://mystic.the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights.torrent), [full weights](https://mystic.the-eye.eu/public/AI/models/GPT-NeoX-20B/full_weights.torrent).
+Weights can be alternatively be downloaded using a BitTorrent client. Torrent files can be downloaded here: [slim weights](https://the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights.torrent), [full weights](https://the-eye.eu/public/AI/models/GPT-NeoX-20B/full_weights.torrent).
+
+We additionally have 150 checkpoints saved throughout training, one every 1,000 steps. We are working on figuring out how to best serve these at scale, but in the meanwhile people interested in working with the partially trained checkpoints can email us at contact@eleuther.ai to arrange access.
 
 # Quick Start
 
@@ -74,7 +65,7 @@ Weights can be alternatively be downloaded using a BitTorrent client. Torrent fi
 
 ### Host Setup
 
-First make sure you are in an environment with Python 3.8 or later with an appropriate version of PyTorch 1.8 or later installed.
+First make sure you are in an environment with Python 3.8 with an appropriate version of PyTorch 1.8 or later installed. **Note:** Some of the libraries that GPT-NeoX depends on have not been updated to be compatible with Python 3.10+. Python 3.9 appears to work, but this codebase has been developed and tested for Python 3.8.
 
 To install the remaining basic dependencies, run:
 
@@ -163,6 +154,16 @@ You can add an arbitrary list of evaluation tasks here, for details of all tasks
 
 For more details on each entry point, see the [Training and Finetuning](#training-and-finetuning), [Inference](#inference) and [Evaluation](#evaluation) sections.
 
+## Running on a single GPU
+
+We provide a simple script for merging the 20B checkpoints to be run on a single GPU. First, download the slim weights from [above](#download-links), and run the following script:
+
+```bash
+python tools/merge20b.py --input_dir ./20B_checkpoints --output_dir ./20B_checkpoints_merged
+```
+
+As an alternative, you can also use [Minimal GPT-NeoX-20B](https://github.com/zphang/minimal-gpt-neox-20b) implementation, which runs and pure PyTorch on a single GPU, and does not require DeepSpeed.
+
 # Configuration
 
 GPT-NeoX parameters are defined in a YAML configuration file which is passed to the deepy.py launcher. We have provided some example .yaml files in [configs](./configs/), including one for GPT-NeoX-20B, and example configuration files for other model sizes.
@@ -189,7 +190,7 @@ or with the GPT-NeoX-20B tokenizer (assuming you have it saved at `./20B_checkpo
 python prepare_data.py -d ./data -t HFTokenizer --vocab-file ./20B_checkpoints/20B_tokenizer.json
 ```
 
-The tokenized data will be saved out to two files at `[data-dir]/[dataset-name]/[dataset-name]_text_document.bin` & `[data-dir]/[dataset-name]/[dataset-name]_text_document.bin`. You will need to add the prefix that both these files share to your training configuration file under the `data-path` field. E.G:
+The tokenized data will be saved out to two files: `[data-dir]/[dataset-name]/[dataset-name]_text_document.bin`and `[data-dir]/[dataset-name]/[dataset-name]_text_document.idx`. You will need to add the prefix that both these files share to your training configuration file under the `data-path` field. E.G:
 
 ```yaml
   "data-path": "./data/enron/enron_text_document",
@@ -206,7 +207,7 @@ Next make sure to download the GPT2 tokenizer vocab, and merge files from the fo
 
 Or use the 20B tokenizer (for which only a single Vocab file is needed):
 
-- Vocab: https://mystic.the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights/20B_tokenizer.json
+- Vocab: https://the-eye.eu/public/AI/models/GPT-NeoX-20B/slim_weights/20B_tokenizer.json
 
 (alternatively, you can provide any tokenizer file that can be loaded by Huggingface's tokenizers library with the `Tokenizer.from_pretrained()` command)
 
@@ -277,7 +278,7 @@ The general usage pattern is:
 python ./deepy.py train.py [path/to/config1.yml] [path/to/config2.yml] ...
 ```
 
-You can pass in an arbritrary number of configs which will all be merged at runtime.
+You can pass in an arbitrary number of configs which will all be merged at runtime.
 
 You can also optionally pass in a config prefix, which will assume all your configs are in the same folder and append that prefix to their path.
 
@@ -325,24 +326,39 @@ EleutherAI is currently using [Weights & Biases to record our experiments](https
 
 We also support using TensorBoard via the <code><var>tensorboard-dir</var></code> field. Dependencies required for TensorBoard monitoring can be found in and installed from  `./requirements/requirements-tensorboard.txt`.
 
+# Running on multi-node
+
+If you need to supply a hostfile for use with the MPI-based DeepSpeed launcher, you can set the environment variable `DLTS_HOSTFILE` to point to the hostfile.
+
 # Administrative Notes
 
 ## Citing GPT-NeoX
 
-If you have found GPT-NeoX helpful in your work, you can cite this repository as
+If you have found the GPT-NeoX library helpful in your work, you can cite this repository as
 
 ```bibtex
-@software{gpt-neox,
-  author = {Andonian, Alex and Anthony, Quentin and Biderman, Stella and Black, Sid and Gali, Preetham and Gao, Leo and Hallahan, Eric and Levy-Kramer, Josh and Leahy, Connor and Nestler, Lucas and Parker, Kip and Pieler, Michael and Purohit, Shivanshu and Songz, Tri and Wang, Phil and Weinbach, Samuel},
-  title = {{GPT-NeoX}: Large Scale Autoregressive Language Modeling in PyTorch},
-  url = {http://github.com/eleutherai/gpt-neox},
-  year = {2021}
+@software{gpt-neox-library,
+  title = {{GPT-NeoX: Large Scale Autoregressive Language Modeling in PyTorch}},
+  author = {Andonian, Alex and Anthony, Quentin and Biderman, Stella and Black, Sid and Gali, Preetham and Gao, Leo and Hallahan, Eric and Levy-Kramer, Josh and Leahy, Connor and Nestler, Lucas and Parker, Kip and Pieler, Michael and Purohit, Shivanshu and Songz, Tri and Phil, Wang and Weinbach, Samuel},
+  url = {https://www.github.com/eleutherai/gpt-neox},
+  doi = {10.5281/zenodo.5879544},
+  month = {8},
+  year = {2021},
+  version = {0.0.1},
 }
 ```
 
-In the above BibTex entry, names are in alphabetical order, and the year corresponds to the project's open-source release.
+To cite our 20 billion parameter model, please use
 
-To cite GPT-NeoX-20B (model), please use [this citation](#gpt-neox-20b).
+```bibtex
+@inproceedings{gpt-neox-20b,
+  title={{GPT-NeoX-20B}: An Open-Source Autoregressive Language Model},
+  author={Black, Sid and Biderman, Stella and Hallahan, Eric and Anthony, Quentin and Gao, Leo and Golding, Laurence and He, Horace and Leahy, Connor and McDonell, Kyle and Phang, Jason and Pieler, Michael and Prashanth, USVSN Sai and Purohit, Shivanshu and Reynolds, Laria and Tow, Jonathan and Wang, Ben and Weinbach, Samuel},
+  booktitle={Proceedings of the ACL Workshop on Challenges \& Perspectives in Creating Large Language Models},
+  url={https://arxiv.org/abs/2204.06745},
+  year={2022}
+}
+```
 
 ## Licensing
 
@@ -363,6 +379,18 @@ This repository hosts code that is part of EleutherAI's GPT-NeoX project. Copyri
 This repository is based off code written by NVIDIA that is licensed under the Apache License, Version 2.0. In accordance with the Apache License, all files that are modifications of code originally written by NVIDIA maintain a NVIDIA copyright header. All files that do not contain such a header are original to EleutherAI contributors. When the NVIDIA code has been modified from its original version, that fact is noted in the copyright header. All derivative works of this repository must preserve these headers under the terms of the Apache License.
 
 For full terms, see the `LICENSE` file. If you have any questions, comments, or concerns about licensing please email us at contact@eleuther.ai.
+
+## Publications
+
+The following publications have come out of this project:
+
+ - Black, Biderman, Hallahan, Anthony, Gao, Golding, He, Leahy, McDonell, Phang, Pieler, Prashanth, Purohit, Reynolds, Tow, Wang, and Weinbach. "[GPT-NeoX-20B: An Open-Source Autoregressive Language Model](https://arxiv.org/abs/2204.06745)." In *Proceedings of the ACL Workshop on Challenges \& Perspectives in Creating Large Language Models*. 2022.s
+
+The following publications by other research groups use this library:
+- Chi, Fan, Ramadge, and Rudnicky. "[KERPLE: Kernelized Relative Positional Embedding for Length Extrapolation](https://arxiv.org/abs/2205.09921)". _arXiv preprint arXiv:2205.09921_. 2022.
+- Horawalavithana, Ayton, Sharma, Howland, Subramanian, Vasquez, Cosbey, Glenski, and Volkova. "[Foundation Models of Scientific Knowledge for Chemistry: Opportunities, Challenges and Lessons Learned](https://openreview.net/pdf?id=SLX-I2MHUZ9)." In *Proceedings of the ACL Workshop on Challenges \& Perspectives in Creating Large Language Models*. 2022.
+- Kolak, Martins, Le Goues, and Hellendoorn. "[Patch Generation with Language Models: Feasibility and Scaling Behavior](https://openreview.net/forum?id=rHlzJh_b1-5)"." In *Proceedings of the Deep Learning for Code Workshop at ICLR*. 2022.
+- Xu, Alon, Neubig, and Hellendoorn. "[A Systematic Evaluation of Large Language Models of Code](https://arxiv.org/abs/2202.13169)." In *Proceedings of the ICLR Workshop on Deep Learning For Code*. 2022.
 
 ## Acknowledgements
 

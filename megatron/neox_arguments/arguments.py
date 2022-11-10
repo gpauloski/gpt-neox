@@ -79,6 +79,9 @@ BASE_CLASSES = [
 DEEPSPEED_ARG_CLASSES = [NeoXArgsDeepspeedRunner, NeoXArgsDeepspeedConfig]
 NEOX_ARG_CLASSES = [i for i in BASE_CLASSES if i not in DEEPSPEED_ARG_CLASSES]
 
+if "DLTS_HOSTFILE" in os.environ:
+    DLTS_HOSTFILE = os.environ["DLTS_HOSTFILE"]
+
 
 @dataclass
 class NeoXArgs(*BASE_CLASSES):
@@ -283,6 +286,14 @@ class NeoXArgs(*BASE_CLASSES):
             default=None,
             help="prefix to append to eval results file",
         )
+        parser.add_argument(
+            "-H",
+            "--hostfile",
+            type=str,
+            help="Hostfile path (in MPI style) that defines the "
+            "resource pool available to the job (e.g., "
+            "worker-0 slots=4)",
+        )
         group = parser.add_argument_group(title="Generation args")
         group.add_argument(
             "-i",
@@ -382,6 +393,12 @@ class NeoXArgs(*BASE_CLASSES):
                 args_list.extend(
                     self.convert_key_value_to_command_line_arg(key, configured_value)
                 )
+        if "DLTS_HOSTFILE" in os.environ:
+            args_list.extend(
+                self.convert_key_value_to_command_line_arg(
+                    "hostfile", os.environ["DLTS_HOSTFILE"]
+                )
+            )
 
         if (
             "--include" in args_list or "--exclude" in args_list
@@ -531,6 +548,11 @@ class NeoXArgs(*BASE_CLASSES):
             from deepspeed.utils.distributed import mpi_discovery
 
             mpi_discovery()
+
+        if self.deepspeed_slurm:
+            os.environ["LOCAL_RANK"] = os.environ["SLURM_LOCALID"]
+            os.environ["RANK"] = os.environ["SLURM_PROCID"]
+            os.environ["WORLD_SIZE"] = os.environ["SLURM_NTASKS"]
 
         self.update_value("local_rank", int(os.getenv("LOCAL_RANK", "0")))
         self.update_value("rank", int(os.getenv("RANK", "0")))
@@ -856,7 +878,7 @@ class NeoXArgs(*BASE_CLASSES):
         if self.hidden_size % self.num_attention_heads != 0:
             error_message = (
                 self.__class__.__name__
-                + ".validate_values() hidden_size must be divisable by num_attention_heads"
+                + ".validate_values() hidden_size must be divisible by num_attention_heads"
             )
             logging.error(error_message)
             raise ValueError(error_message)

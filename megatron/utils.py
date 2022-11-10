@@ -104,6 +104,10 @@ def get_ltor_masks_and_position_ids(
 def local_rank():
     """Local rank of process"""
     local_rank = os.environ.get("LOCAL_RANK")
+
+    if local_rank is None:
+        local_rank = os.environ.get("SLURM_LOCALID")
+
     if local_rank is None:
         print(
             "utils.local_rank() environment variable LOCAL_RANK not set, defaulting to 0",
@@ -147,7 +151,9 @@ def init_wandb(neox_args):
         return
 
     if not neox_args.wandb_init_all_ranks:
-        use_wandb = is_local_main() and (get_wandb_api_key(neox_args=neox_args) is not None)
+        use_wandb = is_local_main() and (
+            get_wandb_api_key(neox_args=neox_args) is not None
+        )
         neox_args.update_value("use_wandb", use_wandb)
     if neox_args.use_wandb:
         group_name = neox_args.wandb_group
@@ -274,7 +280,7 @@ class Timers:
         """Write timers to a tensorboard writer"""
         # currently when using add_scalars,
         # torch.utils.add_scalars makes each timer its own run, which
-        # polutes the runs list, so we just add each as a scalar
+        # pollutes the runs list, so we just add each as a scalar
         assert normalizer > 0.0
         for name in names:
             value = self.timers[name].elapsed(reset=reset) / normalizer
@@ -408,7 +414,7 @@ def setup_for_inference_or_eval(
     from megatron.neox_arguments import NeoXArgs
     from megatron.initialize import initialize_megatron
     from megatron.training import setup_model_and_optimizer
-
+    
     _overwrite_values = {
         "checkpoint_activations": False,
         "partition_activations": False,
@@ -423,6 +429,9 @@ def setup_for_inference_or_eval(
 
     if neox_args.load is None:
         raise ValueError("`load` parameter must be supplied to load a model`")
+
+    # initialize wandb
+    init_wandb(neox_args=neox_args)
 
     # initialize megatron
     initialize_megatron(neox_args)
