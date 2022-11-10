@@ -9,7 +9,9 @@ import torch
 import torch.distributed as dist
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import _LRScheduler
+from torch._utils import _flatten_dense_tensors
 
+from deepspeed.runtime.utils import get_weight_norm
 from deepspeed.runtime.engine import DeepSpeedEngine as _DeepSpeedEngine
 from deepspeed.runtime.pipe.engine import PipelineEngine as _PipelineEngine
 from deepspeed.runtime.pipe.module import PipelineModule
@@ -223,15 +225,33 @@ def _take_model_step(self, lr_kwargs):
             self.stored_gradients = list([p.grad.clone() for p in self.module.parameters()])
 
     if self.preconditioner is not None:
-        if (
-            (
-                hasattr(self.optimizer, 'overflow') 
-                and not self.optimizer.overflow
-                # skip first step because overflow flag not set
-                and self.global_steps > 0
+        # Copy from deepspeed/runtime/fp16/fused_optimizer.py
+        # This check is done in optimizer step but we need to know ahead of
+        # time of preconditioner.
+        # First compute norm for all group so we know if there is overflow
+        grads_groups_flat = []
+        norm_groups = []
+        for i, group in enumerate(self.optimizer.fp16_groups):
+            grads_groups_flat.append(
+                _flatten_dense_tensors(
+                    [
+                        torch.zeros(p.size(), dtype=p.dtype, device=p.device)
+                        if p.grad is None
+                        else p.grad
+                        for p in group
+                    ]
+                )
             )
-            or not hasattr(self.optimizer, 'overflow')
-        ):
+            norm_groups.append(
+                get_weight_norm(grads_groups_flat[i], mpu=self.optimizer.mpu)
+            )
+
+        overflow = self.optimizer.overflow_checker.check_using_norm(norm_groups)
+        del grads_groups_flat
+        del norm_groups
+
+        # Skip first step to let things settle
+        if not overflow and self.global_steps > 0:
             self.timers('_step_precondition').start()
             self.preconditioner.step()
             self.timers('_step_precondition').stop()
